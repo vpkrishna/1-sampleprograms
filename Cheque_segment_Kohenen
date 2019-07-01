@@ -1,0 +1,339 @@
+library(kohonen)
+library(caTools)
+library(factoextra)
+library(NbClust)
+library(cluster)
+library(Hmisc) 
+library(psych)
+library(PCAmixdata)
+##############
+
+rvce_data<-read.csv( )
+
+rvce_data<-rvce_data[,-c(1,43)]
+
+clust_list<-c(          
+)
+
+ 
+##################################################
+data_train_matrix <- as.matrix(scale(training[,clust_list]))
+names(data_train_matrix) <- names(training[,clust_list])
+
+
+data_validation_matrix <- as.matrix(scale(validation[,clust_list]))
+names(data_validation_matrix) <- names(validation[,clust_list])
+
+
+data_train_matrix <- as.matrix(scale(training))
+names(data_train_matrix) <- names(training)
+
+
+data_validation_matrix <- as.matrix(scale(validation ))
+names(data_validation_matrix) <- names(validation)
+
+
+
+######################################################
+
+
+data_train_matrix <- as.matrix(scale(rvce_data[,clust_list]))
+names(data_train_matrix) <- names(rvce_data[,clust_list])
+
+
+som_grid <- somgrid(xdim = 60 , ydim=60, topo="hexagonal")
+
+system.time(som_model <- som(data_train_matrix, 
+                              grid=som_grid, 
+                              rlen=3000, 
+                              alpha=c(0.05,0.01), 
+                              n.hood = "circular",
+                              keep.data = TRUE )) 
+
+plot(som_model,type="counts")
+plot(som_model,type="changes")
+plot(som_model, type="codes", main = c("Codes X", "Codes Y"))
+
+
+# ------------------ Clustering SOM results -------------------
+
+# show the WCSS metric for kmeans for different clustering sizes.
+# Can be used as a "rough" indicator of the ideal number of clusters
+mydata <- som_model$codes
+wss <- (nrow(mydata)-1)*sum(apply(mydata,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(mydata,
+                                     centers=i)$withinss)
+par(mar=c(5.1,4.1,4.1,2.1))
+plot(1:15, wss, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares", main="Within cluster sum of squares (WCSS)")
+
+plot(hclust(dist(som_model$codes)))
+
+fviz_nbclust(mydata, kmeans, method = "gap_stat")
+
+dd <- dist(som_model$codes, method = "euclidean")
+hc <- plot(hclust(dd, method = "ward.D2"))
+
+som_cluster <- (eclust(som_model$codes, "hclust", k = 5,
+                 method = "ward.D2", graph = FALSE)) 
+fviz_dend(som_cluster, rect = TRUE, show_labels = TRUE, cex = 0.5) 
+
+
+intern <- clValid(mydata, nClust = 2:5, 
+                  clMethods = c("hierarchical","kmeans"),
+                  validation = "internal")
+# Summary
+summary(intern)
+
+
+som_cluster <- (eclust(som_model$codes, "hclust", k=7,
+                       method = "ward.D2", graph = FALSE)) 
+som_cluster<-som_cluster$cluster
+clus.centers <- aggregate(som_model$codes, list(som_cluster), mean)
+clus.centers <- clus.centers[, -1]
+km.res2 <- eclust(som_model$codes , "kmeans", k = clus.centers, graph = FALSE)
+som_cluster<-km.res2$cluster
+
+nb <- NbClust(som_model$codes, distance = "euclidean", min.nc = 2,
+              max.nc = 10, method = "complete", index ="all")
+
+
+gap_stat <- clusGap(som_model$codes , FUN = hcut, K.max = 15 , B = 100)
+# Plot gap statistic
+fviz_gap_stat(gap_stat)
+
+som_cluster<-(kmeans(som_model$codes,5,nstart=40))$cluster
+#som_cluster<-pam(som_model$codes,6)$clustering
+#som_cluster <- cutree(hclust(dd, method = "ward.D2"),3)
+
+
+# Form clusters on grid
+## use hierarchical clustering to cluster the codebook vectors
+#som_cluster <- cutree(hclust(dist(som_model$codes)),8)
+
+# Show the map with different colours for every cluster						  
+plot(som_model, type="mapping", bgcol = pretty_palette[som_cluster],keepMargins=TRUE, main = "Clusters")
+add.cluster.boundaries(som_model, som_cluster)
+
+#show the same plot with the codes instead of just colours
+plot(som_model, type="codes", bgcol = pretty_palette[som_cluster], main = "Clusters")
+add.cluster.boundaries(som_model, som_cluster)
+
+
+clusters<-som_cluster[som_model$unit.classif]
+rvce_data<-cbind(training,"clusters"=clusters)
+dim(subset(rvce_data,rvce_data$clusters==1))[1]
+#2019
+dim(subset(rvce_data,rvce_data$clusters==2))[1]
+#847
+dim(subset(rvce_data,rvce_data$clusters==3))[1]
+#854
+dim(subset(rvce_data,rvce_data$clusters==4))[1]
+#4970
+dim(subset(rvce_data,rvce_data$clusters==5))[1]
+#6920
+dim(subset(rvce_data,rvce_data$clusters==6))[1]
+#5472
+
+rvce_data$clusters[rvce_data$clusters==2]<-3
+som_cluster[som_cluster==2]<-3
+
+###FIND MAX,MIN,STD DEV
+
+cluster1<-subset(rvce_data,rvce_data$clusters==1)
+cluster3<-subset(rvce_data,rvce_data$clusters==3)
+cluster4<-subset(rvce_data,rvce_data$clusters==4)
+cluster5<-subset(rvce_data,rvce_data$clusters==5)
+cluster6<-subset(rvce_data,rvce_data$clusters==6)
+
+max(rvce_data$avg_dda_bal_6m)
+#430601.5
+max(cluster1$avg_dda_bal_6m)
+max(cluster3$avg_dda_bal_6m)
+max(cluster4$avg_dda_bal_6m)
+max(cluster5$avg_dda_bal_6m)
+max(cluster6$avg_dda_bal_6m)
+
+
+min(rvce_data$avg_dda_bal_6m)
+#430601.5
+min(cluster1$avg_dda_bal_6m)
+min(cluster3$avg_dda_bal_6m)
+min(cluster4$avg_dda_bal_6m)
+min(cluster5$avg_dda_bal_6m)
+min(cluster6$avg_dda_bal_6m)
+
+mean(rvce_data$cust_tenure)
+#430601.5
+mean(cluster1$cust_tenure)
+mean(cluster3$cust_tenure)
+mean(cluster4$cust_tenure)
+mean(cluster5$cust_tenure)
+mean(cluster6$cust_tenure)
+
+
+min(rvce_data$cust_tenure)
+#430601.5
+min(cluster1$cust_tenure)
+min(cluster3$cust_tenure)
+min(cluster4$cust_tenure)
+min(cluster5$cust_tenure)
+min(cluster6$cust_tenure)
+
+
+###############################stats from clusters#################
+
+
+stat.desc_m<-function (x, basic = TRUE, desc = TRUE, norm = FALSE, p = 0.95) 
+{
+  stat.desc.vec <- function(x, basic, desc, norm, p) {
+    x <- unlist(x)
+    if (!is.numeric(x)) {
+      Nbrval <- NA
+      Nbrnull <- NA
+      Nbrna <- NA
+      Median <- NA
+      Mean <- NA
+      StdDev <- NA
+      if (basic == TRUE) {
+        Res1 <- list(nbr.val = NA, nbr.null = NA, nbr.na = NA, 
+                     min = NA, max = NA, range = NA, sum = NA)
+      }
+      else Res1 <- NULL
+      if (desc == TRUE) {
+        CIMean <- NA
+        names(CIMean) <- p
+        Res2 <- list(median = NA, mean = NA, SE.mean = NA, 
+                     CI.mean = NA, var = NA, std.dev = NA, coef.var = NA)
+      }
+      else Res2 <- NULL
+      if (norm == TRUE) {
+        Res3 <- list(skewness = NA, skew.2SE = NA, kurtosis = NA, 
+                     kurt.2SE = NA, normtest.W = NA, normtest.p = NA)
+      }
+      else Res3 <- NULL
+    }
+    else {
+      Nbrna <- sum(as.numeric(is.na(x)))
+      x <- x[!is.na(x)]
+      Nbrval <- length(x)
+      Nbrnull <- sum(as.numeric(x == 0))
+      if (basic == TRUE) {
+        Min <- min(x)
+        Max <- max(x)
+        Range <- Max - Min
+        Sum <- sum(as.numeric(x))
+        Res1 <- list(nbr.val = Nbrval, nbr.null = Nbrnull, 
+                     nbr.na = Nbrna, min = Min, max = Max, range = Range, 
+                     sum = Sum)
+      }
+      else Res1 <- NULL
+      Median <- median(x)
+      names(Median) <- NULL
+      Mean <- mean(x)
+      Var <- var(x)
+      StdDev <- sqrt(Var)
+      SEMean <- StdDev/sqrt(Nbrval)
+      if (desc == TRUE) {
+        CIMean <- qt((0.5 + p/2), (Nbrval - 1)) * SEMean
+        names(CIMean) <- p
+        CoefVar <- StdDev/Mean
+        Res2 <- list(median = Median, mean = Mean, SE.mean = SEMean, 
+                     CI.mean = CIMean, var = Var, std.dev = StdDev, 
+                     coef.var = CoefVar)
+      }
+      else Res2 <- NULL
+      if (norm == TRUE) {
+        Skew <- sum((x - mean(x))^3)/(length(x) * sqrt(var(x))^3)
+        Kurt <- sum((x - mean(x))^4)/(length(x) * var(x)^2) - 
+          3
+        SE <- sqrt(6 * Nbrval * (Nbrval - 1)/(Nbrval - 
+                                                2)/(Nbrval + 1)/(Nbrval + 3))
+        Skew.2SE <- Skew/(2 * SE)
+        SE <- sqrt(24 * Nbrval * ((Nbrval - 1)^2)/(Nbrval - 
+                                                     3)/(Nbrval - 2)/(Nbrval + 3)/(Nbrval + 5))
+        Kurt.2SE <- Kurt/(2 * SE)
+        Ntest <- shapiro.test(x)
+        Ntest.W <- Ntest$statistic
+        names(Ntest.W) <- NULL
+        Ntest.p <- Ntest$p.value
+        Res3 <- list(skewness = Skew, skew.2SE = Skew.2SE, 
+                     kurtosis = Kurt, kurt.2SE = Kurt.2SE, normtest.W = Ntest.W, 
+                     normtest.p = Ntest.p)
+      }
+      else Res3 <- NULL
+    }
+    Res <- unlist(c(Res1, Res2, Res3))
+    if (length(Res) == 0) 
+      Res <- unlist(list(nbr.val = Nbrval, nbr.null = Nbrnull, 
+                         nbr.na = Nbrna, median = Median, mean = Mean, 
+                         std.dev = StdDev))
+    Res
+  }
+  Basic <- basic
+  Desc <- desc
+  Norm <- norm
+  P <- p
+  if (is.vector(x)) 
+    stat.desc.vec(x, Basic, Desc, Norm, P)
+  else {
+    x <- as.data.frame(x)
+    NamesV <- names(x)
+    StatM <- NULL
+    for (i in 1:ncol(x)) {
+      StatV <- stat.desc.vec(x[i], Basic, Desc, Norm, P)
+      if (is.null(StatM) == TRUE) 
+        StatM <- data.frame(StatV)
+      else StatM <- cbind(StatM, StatV)
+    }
+    names(StatM) <- NamesV
+    StatM
+  }
+}
+
+
+sig.lim <- function(x) 
+{return(c(U3SL=mean(x,na.rm=T)+3*sd(x,na.rm=T),L3SL=mean(x,na.rm=T)-3*sd(x,na.rm=T)))}
+sig.lim_2 <- function(x) 
+{return(c(U2SL=mean(x,na.rm=T)+2*sd(x,na.rm=T),L2SL=mean(x,na.rm=T)-2*sd(x,na.rm=T)))}
+sig.lim_1 <- function(x) 
+{return(c(U1SL=mean(x,na.rm=T)+1*sd(x,na.rm=T),L1SL=mean(x,na.rm=T)-1*sd(x,na.rm=T)))}
+
+quant=function(x) {quantile(x,probs=c(0.00, 0.01,.02,0.05, 0.10, .15,0.20,.25,0.30,0.40,0.50,0.60,
+                                      0.7,0.75, 0.80,.85, 0.90, 0.95, .98,0.990,.999, 1.),na.rm=T)}
+distinct = function(x){return(length(unique(x)))}
+
+
+
+
+
+sig3_lim=sapply(data_num,sig.lim)
+sig2_lim=sapply(data_num,sig.lim_2)
+sig1_lim=sapply(data_num,sig.lim_1)
+quants=sapply(data_num,quant)
+des_stat_p1=stat.desc_m(data_num, basic=TRUE, desc=TRUE, norm=F, p=0.95)
+distinct_cnt = sapply(data_num, distinct)
+univar_num=round(data.frame(
+  rbind(des_stat_p1,distinct_cnt,quants,sig3_lim,sig2_lim,sig1_lim)
+),3)
+
+nbr.na <- length(which(is.na(unlist(data_num))|unlist(data_num)==""|is.nan(unlist(data_num)))) # Find number of missing
+tot <- length(unlist(data_num))
+
+
+num_stat <- data.frame(t(univar_num))
+num_stat <- transform(num_stat,
+                      Missing_Percent = nbr.na/(nbr.val+nbr.na),
+                      Zero_Perc = nbr.null/(nbr.val+nbr.na))
+
+names(num_stat) <- c("NonMissing" ,	"Zero_Count",	"Missing",	"Min",	"Max",	"range",	"sum"	
+                     ,"median",	"Avg",	"SE.mean",	"CI.mean.0.95",	"variance",	"SD",	"CV",	
+                     "distinct_cnt",	"P0",	"P1",	"p2","P5",	"P10","p15",	"P20","p25",	"P30",
+                     "P40","P50",	"P60",	"P70",	"P75",	"P80","p85",	"P90",	"P95",	"P98",	
+                     "P99","p99_9","P100","U3SL","L3SL","U2SL",	"L2SL","U1SL","L1SL","Missing_Percent",	"Zero_Perc")
+
+
+
+
+write.csv(num_stat,"cluster1.csv")
+

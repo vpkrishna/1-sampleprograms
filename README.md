@@ -2,6 +2,10 @@
  
  >> Gradient Descent implementation and derivation using python
  
+ >> Sentiment analysis of political leaders 
+ 
+ >> sentiment analysis of airline tweets 
+ 
  >> Customer attrition prediction using  Tensorflow
  
  >> LSTM end of month balance using tensorflow

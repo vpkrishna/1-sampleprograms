@@ -1,0 +1,165 @@
+import pandas as pd
+import numpy as np
+
+"""model selection """
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+from sklearn.datasets import load_breast_cancer
+
+
+from sklearn.impute import SimpleImputer
+
+from sklearn.preprocessing import StandardScaler,OneHotEncoder
+
+from sklearn.compose import ColumnTransformer, make_column_transformer
+
+from sklearn.ensemble import GradientBoostingClassifier,VotingClassifier,RandomForestClassifier
+   
+from sklearn.linear_model    import LogisticRegression ,SGDClassifier
+
+from sklearn.pipeline import Pipeline,make_pipeline,FeatureUnion
+ 
+
+""" flow
+1) Data preprocessing as part of pipeline
+2) Voting classifier as part of pipeline
+3) Gridsearchcv as pasrt of pipeline
+
+"""
+
+
+data = load_breast_cancer()
+breast_df=pd.DataFrame(data.data,columns=data.feature_names)
+breast_target=data.target
+
+SEED=1223          
+X_train,X_test,y_train,y_test=train_test_split(breast_df,breast_target,test_size=.3)
+
+#X_train=X_train[0:100]
+
+#y_train=y_train[0:100]
+
+
+##to lowercase
+breast_df.columns=map(str.lower,breast_df.columns)
+
+###get count of missing values
+breast_df.isna().sum()/breast_df.shape[0]
+missing_df=pd.DataFrame(breast_df.isna().sum()/breast_df.shape[0])
+for values in zip(missing_df.index,missing_df[0]):
+    print(values)
+    
+  
+
+int_feat   = breast_df.columns[breast_df.dtypes=='int64'].tolist() 
+float_feat = breast_df.columns[breast_df.dtypes=='float64'].tolist()
+obj_feat   = breast_df.columns[breast_df.dtypes=='object'].tolist()  
+cat_feat   = breast_df.columns[breast_df.dtypes=='category'].tolist()  
+
+num_features=int_feat + float_feat
+cat_features=obj_feat + cat_feat
+
+ 
+
+ 
+ 
+
+sgd=SGDClassifier(loss='log')  
+log=LogisticRegression()
+gbm=GradientBoostingClassifier()
+rf = RandomForestClassifier()          
+
+gbm.get_params
+
+params_dt =        { 
+                    #'voting__clf1__alpha': [1e-4, 1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3],
+                    'voting__clf1__alpha': [1e-4,1e-3],# learning rate
+                    #'voting__clf1__l1_ratio': [0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1],
+                    'voting__clf1__l1_ratio': [.1,.2],
+                    'voting__clf1__n_iter': [1000] ,
+                    'voting__clf1__n_jobs': [-1],
+                    #'voting__clf2__C': [1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1e0],
+                    'voting__clf2__C': [1e-7, 1e-6],
+                    'voting__clf2__penalty': ['l1','l2'],
+                    'voting__clf2__n_jobs': [-1],
+                    #'voting__clf3__learning_rate':[.001,.01,.1],
+                    'voting__clf3__learning_rate':[.001,.01,.1],
+                    #'voting__clf3__max_depth':[2,3],
+                    'voting__clf3__max_depth':[2,3],
+                    #'voting__clf3__max_features':[.7,.8],
+                    #'voting__clf3__min_samples_leaf':[15,30],
+                    #'voting__clf3__min_samples_split':[15,30],
+                    #'voting__clf3__n_estimators':[500,600]
+                    'voting__clf3__max_features':[.7,.8],
+                    'voting__clf3__min_samples_leaf':[15,30],
+                    'voting__clf3__min_samples_split':[15,30],
+                    'voting__clf3__n_estimators':[500]
+                    
+                    }
+ 
+
+votes=VotingClassifier(estimators=[('clf1', sgd),('clf2', log),('clf3', gbm),
+                                   ('clf4',rf)],
+                                    voting='soft')
+
+preprocess = make_column_transformer(
+    (make_pipeline(SimpleImputer(), StandardScaler()),num_features),
+    (OneHotEncoder(),cat_features))
+
+
+pipe = Pipeline([('preprocess',preprocess),
+                 ('voting',    votes)
+])
+    
+###pipe.get_params
+    
+grid_dt = GridSearchCV(estimator=pipe,  
+                               param_grid=params_dt,
+                               cv=5,
+                               n_jobs=-1)
+
+grid_dt.fit(X_train,y_train)
+grid_dt.best_estimator_
+grid_dt.best_params_
+grid_dt.best_score_    
+
+grid_dt.estimator
+
+best_model = grid_dt.best_estimator_
+test_acc = best_model.score(X_test,y_test)
+
+
+
+from sklearn.metrics import roc_auc_score
+# Extract the best estimator
+best_model = grid_dt.best_estimator_
+
+# Predict the test set probabilities of the positive class
+y_pred_proba = best_model.predict_proba(X_test)
+
+# Compute test_roc_auc
+test_roc_auc = roc_auc_score(y_test,y_pred_proba[:,1])
+
+# Print test_roc_auc
+print('Test set ROC AUC score: {:.3f}'.format(test_roc_auc))
+
+
+from sklearn.metrics import confusion_matrix
+ 
+
+labels = [0,1]
+print(confusion_matrix(y_test, best_model.predict(X_test),labels))
+ 
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve
+
+y_pred_proba = best_model.predict_proba(X_test)
+fpr,tpr,thresholds=roc_curve(y_test,y_pred_proba[:,1])
+
+plt.plot([0,1],[0,1],'k--')
+plt.plot(fpr,tpr,label='Stochastic gradient descent')
+plt.xlabel('False positive rate')
+plt.ylabel('True positive rate')
+plt.title(test_roc_auc)
+plt.title("roc")
+plt.show()

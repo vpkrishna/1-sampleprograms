@@ -1,4 +1,4 @@
-""" GBM implementation basics using dt """
+""" Without learning rate GBM implementation basics using dt..Without learning rate  """
 
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error

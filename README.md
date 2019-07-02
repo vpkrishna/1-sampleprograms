@@ -14,6 +14,4 @@
  
  >> prediction using  sklearn pipeline, votingclassifier and gridsearchcv
  
- >> Kohnenen segmentation, working 
- 
  >> Back propogation derivation and Manual LSTM states calculation

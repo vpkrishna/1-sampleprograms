@@ -1,5 +1,7 @@
  Sample programs 
  
+ >> Cheque segmentation using Kohonen segmentation
+ 
  >> Gradient Descent implementation and derivation using python
  
  >> Sentiment analysis of political leaders 
